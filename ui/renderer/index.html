@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Automation Tool</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>TikTok Automation Tool</h1>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-tab="login-tab">Login</button>
+                <button class="nav-btn" data-tab="comment-tab">Comment</button>
+                <button class="nav-btn" data-tab="settings-tab">Settings</button>
+                <button class="nav-btn" data-tab="logs-tab">Logs</button>
+            </nav>
+        </header>
+
+        <main class="app-content"><button class="nav-btn" data-tab="settings-tab">Settings</button>
+            <!-- Login Tab -->
+            <section id="login-tab" class="tab-content active">
+                <div class="card">
+                    <h2>Login Options</h2>
+                    <div class="login-options">
+                        <div class="option-tabs">
+                            <button class="option-tab active" data-login-option="manual">Manual Login</button>
+                            <button class="option-tab" data-login-option="auto">Auto Login</button>
+                            <button class="option-tab" data-login-option="semi-auto">Semi-Auto Login</button>
+                        </div>
+
+                        <!-- Manual Login Form -->
+                        <div id="manual-login" class="login-option-content active">
+                            <form id="manual-login-form">
+                                <div class="form-group">
+                                    <label for="email">Email/Username:</label>
+                                    <input type="text" id="email" name="email" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="password">Password:</label>
+                                    <input type="password" id="password" name="password" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Gender:</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="gender" value="male" required>
+                                            Male
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="gender" value="female" required>
+                                            Female
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Login</button>
+                            </form>
+                        </div>
+
+                        <!-- Auto Login Form -->
+                        <div id="auto-login" class="login-option-content">
+                            <div class="upload-section">
+                                <button id="upload-user-json" class="btn btn-secondary">
+                                    <i class="material-icons">upload_file</i>
+                                    Upload user.json
+                                </button>
+                                <span id="upload-status"></span>
+                            </div>
+                            <div class="account-list-container">
+                                <h3>Available Accounts</h3>
+                                <div id="account-list" class="account-list">
+                                    <!-- Account items will be dynamically added here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Semi-Auto Login Form -->
+                        <div id="semi-auto-login" class="login-option-content">
+                            <div class="upload-section">
+                                <button id="upload-user-json-semi" class="btn btn-secondary">
+                                    <i class="material-icons">upload_file</i>
+                                    Upload user.json (without gender)
+                                </button>
+                                <span id="upload-status-semi"></span>
+                            </div>
+                            <div class="account-list-container">
+                                <h3>Available Accounts</h3>
+                                <div id="semi-auto-account-list" class="account-list">
+                                    <!-- Account items will be dynamically added here -->
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Select Gender:</label>
+                                <div class="radio-group">
+                                    <label>
+                                        <input type="radio" name="semi-auto-gender" value="male" required>
+                                        Male
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="semi-auto-gender" value="female" required>
+                                        Female
+                                    </label>
+                                </div>
+                            </div>
+                            <button id="semi-auto-login-btn" class="btn btn-primary" disabled>Login Selected Account</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Saved Accounts</h2>
+                    <div class="saved-accounts-container">
+                        <div id="saved-account-list" class="account-list">
+                            <!-- Saved accounts will be displayed here -->
+                            <div class="loading">Loading saved accounts...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Comment Tab -->
+            <section id="comment-tab" class="tab-content">
+                <div class="card mt-4">
+                    <h2>Like Settings</h2>
+                    <div class="form-group">
+                      <div class="checkbox-group">
+                        <input type="checkbox" id="enable-auto-like" name="enableAutoLike">
+                        <label for="enable-auto-like">Enable Auto Like</label>
+                      </div>
+                    </div>
+                    <div class="form-group" id="auto-like-settings">
+                      <label for="like-account-count">Number of accounts to like:</label>
+                      <select id="like-account-count" name="likeAccountCount">
+                        <option value="all">All Accounts</option>
+                        <option value="1">1 Account</option>
+                        <option value="2">2 Accounts</option>
+                        <option value="3">3 Accounts</option>
+                        <option value="5">5 Accounts</option>
+                        <option value="10">10 Accounts</option>
+                        <option value="custom">Custom...</option>
+                      </select>
+                      <div id="custom-like-count" class="mt-2" style="display: none;">
+                        <input type="number" id="custom-like-account-count" min="1" value="1" class="form-control">
+                      </div>
+                    </div>
+                  </div>
+                <div class="card">
+                    <h2>Comment on Videos</h2>
+                    <div class="comment-options">
+                        <div class="option-tabs">
+                            <button class="option-tab active" data-comment-option="manual">Manual Comment</button>
+                            <button class="option-tab" data-comment-option="semi-auto">Semi-Auto Comment</button>
+                            <button class="option-tab" data-comment-option="auto">Auto Comment</button>
+                        </div>
+
+                        <!-- Manual Comment Form -->
+                        <div id="manual-comment" class="comment-option-content active">
+                            <form id="manual-comment-form">
+                                <div class="form-group">
+                                    <label for="video-url">Video URL:</label>
+                                    <input type="text" id="video-url" name="videoUrl" placeholder="https://www.tiktok.com/@username/video/1234567890" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="comment-text">Comment:</label>
+                                    <textarea id="comment-text" name="commentText" rows="3" required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <div class="checkbox-group">
+                                      <input type="checkbox" id="manual-post-all-accounts" name="postAllAccounts">
+                                      <label for="post-all-accounts">Post comment using all active accounts</label>
+                                    </div>
+                                  </div>
+                                <div class="form-group">
+                                    <label>Gender Target:</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="comment-gender" value="male" required>
+                                            Male
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="comment-gender" value="female" required>
+                                            Female
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="comment-account">Comment As:</label>
+                                    <select id="comment-account" name="commentAccount" required>
+                                        <option value="" disabled selected>-- Select Account --</option>
+                                        <!-- Active accounts will be populated here -->
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Post Comment</button>
+                            </form>
+                        </div>
+
+                        <!-- Semi-Auto Comment Form -->
+                        <div id="semi-auto-comment" class="comment-option-content">
+                            <div class="upload-section">
+                                <button id="upload-comment-json" class="btn btn-secondary">
+                                    <i class="material-icons">upload_file</i>
+                                    Upload comments.json
+                                </button>
+                                <span id="upload-comment-status"></span>
+                            </div>
+                            <form id="semi-auto-comment-form">
+                                <div class="form-group">
+                                    <label for="semi-auto-video-url">Video URL:</label>
+                                    <input type="text" id="semi-auto-video-url" name="videoUrl" placeholder="https://www.tiktok.com/@username/video/1234567890" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="semi-auto-comment-select">Select Comment:</label>
+                                    <select id="semi-auto-comment-select" name="commentText" required>
+                                        <option value="" disabled selected>-- Select a Comment --</option>
+                                        <!-- Comments will be populated here -->
+                                    </select>
+                                    
+                                </div>
+                                <div class="form-group">
+                                    <div class="checkbox-group">
+                                      <input type="checkbox" id="semi-auto-post-all-accounts" name="postAllAccounts">
+                                      <label for="post-all-accounts">Post comment using all active accounts</label>
+                                    </div>
+                                  </div>
+                                <div class="form-group">
+                                    <label>Gender Target:</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="semi-auto-comment-gender" value="male" required>
+                                            Male
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="semi-auto-comment-gender" value="female" required>
+                                            Female
+                                        </label>
+                                    </div>
+
+                                </div>
+                                <div class="form-group">
+                                    <label for="semi-auto-comment-account">Comment As:</label>
+                                    <select id="semi-auto-comment-account" name="commentAccount" required>
+                                        <option value="" disabled selected>-- Select Account --</option>
+                                        <!-- Active accounts will be populated here -->
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Post Comment</button>
+                            </form>
+                        </div>
+
+                        <!-- Auto Comment Form -->
+                        <div id="auto-comment" class="comment-option-content">
+                            <div class="upload-section">
+                                <button id="upload-full-comment-json" class="btn btn-secondary">
+                                    <i class="material-icons">upload_file</i>
+                                    Upload comments.json (with gender)
+                                </button>
+                                <span id="upload-full-comment-status"></span>
+                            </div>
+                            <form id="auto-comment-form">
+                                <div class="form-group">
+                                    <label for="auto-video-url">Video URL:</label>
+                                    <input type="text" id="auto-video-url" name="videoUrl" placeholder="https://www.tiktok.com/@username/video/1234567890" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="auto-comment-account">Comment As:</label>
+                                    <select id="auto-comment-account" name="commentAccount" required>
+                                        <option value="" disabled selected>-- Select Account --</option>
+                                        <!-- Active accounts will be populated here -->
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <div class="checkbox-group">
+                                      <input type="checkbox" id="auto-post-all-accounts" name="postAllAccounts">
+                                      <label for="post-all-accounts">Post comment using all active accounts</label>
+                                    </div>
+                                  </div>
+                                <button type="submit" class="btn btn-primary">Post Comment</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logs Tab -->
+            <section id="logs-tab" class="tab-content">
+                <div class="card">
+                    <h2>Activity Logs</h2>
+                    <div class="log-controls">
+                        <button id="clear-logs" class="btn btn-secondary">Clear Logs</button>
+                        <div class="log-filter">
+                            <label for="log-level">Filter:</label>
+                            <select id="log-level">
+                                <option value="all">All</option>
+                                <option value="info">Info</option>
+                                <option value="success">Success</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="logs-container">
+                        <div id="log-entries" class="log-entries">
+                            <!-- Log entries will be added here dynamically -->
+                            <div class="log-entry info">
+                                <span class="timestamp">[00:00:00]</span>
+                                <span class="message">Application started</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settings-tab" class="tab-content">
+                <div class="card">
+                    <h2>Browser Settings</h2>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enable-headless" name="enableHeadless" checked>
+                            <label for="enable-headless">Enable Headless Mode (Browser not visible)</label>
+                        </div>
+                        <p class="mt-2" style="color: var(--text-secondary);">
+                            When disabled, you will see the browser window during automation.
+                            This is useful for debugging.
+                        </p>
+                    </div>
+                    <button id="save-settings" class="btn btn-primary">Save Settings</button>
+                    <span id="settings-saved-message" class="mt-2" style="display: none; color: var(--success);">
+                        Settings saved successfully!
+                    </span>
+                </div>
+                
+                <div class="card mt-4">
+                    <h2>Captcha Settings</h2>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="auto-solve-captcha" name="autoSolveCaptcha" checked>
+                            <label for="auto-solve-captcha">Attempt to solve captchas automatically</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="captcha-service">Captcha Service:</label>
+                        <select id="captcha-service" name="captchaService" class="form-control">
+                            <option value="none">None (Manual Solving)</option>
+                            <option value="2captcha">2Captcha</option>
+                            <option value="anticaptcha">Anti-Captcha</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="captcha-api-key">API Key:</label>
+                        <input type="password" id="captcha-api-key" name="captchaApiKey" class="form-control" 
+                            placeholder="Enter API key for captcha service">
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>TikTok Automation Tool &copy; 2023</p>
+        </footer>
+    </div>
+
+    <script src="js/renderer.js"></script>
+    <script src="js/login.js"></script>
+    <script src="js/comments.js"></script>
+    <script src="js/logs.js"></script>
+</body>
+</html>

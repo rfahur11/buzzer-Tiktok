@@ -65,7 +65,7 @@ async function tiktokLogin(email, password) {
     if (hasCookies) {
       await page.goto('https://www.tiktok.com/', { 
         waitUntil: 'networkidle2',
-        timeout: 300000
+        timeout: 0
       });
 
       
@@ -114,7 +114,7 @@ async function tiktokLogin(email, password) {
     console.log('Mengakses halaman login TikTok...');
     await page.goto('https://www.tiktok.com/login/phone-or-email/email', { 
       waitUntil: 'networkidle2',
-      // timeout: 60000
+      timeout: 0
     });
 
     // Cek apakah ada captcha pada halaman login
@@ -182,7 +182,7 @@ async function tiktokLogin(email, password) {
         // Tunggu navigasi setelah captcha diselesaikan
         await page.waitForNavigation({ 
           waitUntil: 'networkidle2',
-          // timeout: 60000
+          timeout: 0
         }).catch(e => {
           console.log('Navigasi timeout setelah menyelesaikan captcha.');
         });
@@ -193,7 +193,7 @@ async function tiktokLogin(email, password) {
       // Lanjutkan dengan normal navigation wait
       await page.waitForNavigation({ 
         waitUntil: 'networkidle2',
-        // timeout: 60000
+        timeout: 0
       }).catch(e => {
         console.log('Navigasi timeout, mungkin ada CAPTCHA atau verifikasi lain.');
       });
