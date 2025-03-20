@@ -391,51 +391,51 @@ async function handleRotateCaptcha(page) {
     const slideDistance = ((sliderInfo.totalLength - sliderInfo.iconLength) * solution.angle) / 360;
     
     console.log(`Moving slider by ${slideDistance.toFixed(2)}px for ${solution.angle}° rotation`);
-    
-    // LANGKAH 6: Manipulasi slider dengan gerakan mirip manusia
-    // Move cursor to slider
-    await page.mouse.move(
-      handleBox.x + handleBox.width / 2, 
-      handleBox.y + handleBox.height / 2, 
-      { steps: 10 }
-    );
-    
-    // Press and hold mouse button
+
+    // Posisi awal slider
+    const startX = handleBox.x + handleBox.width / 2;
+    const startY = handleBox.y + handleBox.height / 2;
+    const endX = startX + slideDistance;
+
+    // 1. Pindahkan kursor ke posisi awal dengan sedikit gerakan alami
+    await page.mouse.move(startX, startY, { steps: 5 }); // Gerakan kecil menuju slider
+    await waitFor(page, Math.random() * 100 + 50); // Jeda kecil seperti manusia (50-150ms)
+
+    // 2. Tekan tombol mouse (klik dan tahan)
     await page.mouse.down();
-    
-    // Human-like slider movement
-    const steps = Math.floor(Math.random() * 10) + 30;
-    
+
+    // 3. Geser slider dengan durasi tetap dan sedikit variasi
+    const duration = 1000;
+    const steps = 20;
+    const stepTime = duration / steps;
+
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      const easeEffect = 1 - Math.pow(1 - progress, 3);
-      const currentX = handleBox.x + (slideDistance * easeEffect);
-      const randomY = handleBox.y + handleBox.height / 2 + (Math.random() * 2 - 1);
+      const currentX = startX + (slideDistance * progress);
+      // Tambahkan sedikit variasi Y untuk mensimulasikan ketidaksempurnaan manusia
+      const randomY = startY + (Math.random() * 4 - 2); // Variasi kecil ±2px
       
       await page.mouse.move(currentX, randomY, { steps: 1 });
-      
-      if (i < steps && i % 5 === 0) {
-        await waitFor(page, Math.random() * 30);
-      }
+      await waitFor(page, stepTime); // Jeda per langkah sesuai durasi total
     }
-    
-    // Make sure we end at exactly the right position
-    await page.mouse.move(handleBox.x + slideDistance, handleBox.y + handleBox.height / 2);
-    
-    // Release mouse button
+
+    // 4. Pastikan posisi akhir tepat
+    await page.mouse.move(endX, startY); // Akhiri di posisi pasti
+
+    // 5. Lepaskan tombol mouse
     await page.mouse.up();
-    
-    // Wait to see if CAPTCHA is solved
+
+    // 6. Tunggu untuk verifikasi CAPTCHA
     await waitFor(page, 3000);
-    
+
     // LANGKAH 7: Periksa apakah CAPTCHA berhasil diselesaikan
     const captchaStillExists = await checkForCaptcha(page);
     return !captchaStillExists;
-    
-  } catch (error) {
-    console.error('Error saat menyelesaikan rotate CAPTCHA:', error);
-    return false;
-  }
+
+    } catch (error) {
+      console.error('Error saat menyelesaikan rotate CAPTCHA:', error);
+      return false;
+    }
 }
 
 module.exports = {

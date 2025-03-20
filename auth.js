@@ -37,7 +37,7 @@ async function tiktokLogin(email, password) {
     
     // Load cookies logic
     const cookieFileName = `cookies_${email.replace('@', '_').replace('.', '_')}.json`;
-    const cookiePath = path.join(__dirname, '../data/cookies', cookieFileName);
+    const cookiePath = path.join(__dirname, './data/cookies', cookieFileName);
     
     let hasCookies = false;
     
@@ -213,7 +213,7 @@ async function tiktokLogin(email, password) {
       try {
         const cookies = await page.cookies();
         
-        const cookiesDir = path.join(__dirname, '../data/cookies');
+        const cookiesDir = path.join(__dirname, './data/cookies');
         if (!fs.existsSync(cookiesDir)) {
           fs.mkdirSync(cookiesDir, { recursive: true });
         }
