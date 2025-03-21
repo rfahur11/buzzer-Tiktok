@@ -1,6 +1,6 @@
 const { tiktokLogin } = require('./auth');
 const { likeVideo } = require('./like');
-const { commentOnVideo } = require('./comment');
+// const { commentOnVideo } = require('./comment');
 const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 const { 
   loadComments, 
@@ -9,6 +9,9 @@ const {
   ensureDirectoryStructure 
 } = require('./data-loader');
 const { humanDelay, logStatus } = require('./utils.js');
+
+
+
 
 // Track active browser instances for proper cleanup
 const activeBrowsers = [];
@@ -214,11 +217,11 @@ async function manageMultipleAccounts(options = {}) {
         logStatus(`Error with account ${account.email}: ${error.message}`, 'error');
         console.error(error);
         
-        // Close browser on error
-        if (browser) {
-          activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
-          await browser.close();
-        }
+        // // Close browser on error
+        // if (browser) {
+        //   activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
+        //   await browser.close();
+        // }
       }
     }
     
@@ -235,21 +238,21 @@ async function manageMultipleAccounts(options = {}) {
 /**
  * Graceful cleanup when process is interrupted
  */
-async function cleanupOnExit() {
-  logStatus('Process interrupted, cleaning up...', 'warning');
+// async function cleanupOnExit() {
+//   logStatus('Process interrupted, cleaning up...', 'warning');
   
-  // Close all active browsers
-  for (const browser of activeBrowsers) {
-    try {
-      await browser.close();
-      logStatus('Closed browser instance', 'info');
-    } catch (error) {
-      logStatus(`Error closing browser: ${error.message}`, 'error');
-    }
-  }
+//   // Close all active browsers
+//   for (const browser of activeBrowsers) {
+//     try {
+//       await browser.close();
+//       logStatus('Closed browser instance', 'info');
+//     } catch (error) {
+//       logStatus(`Error closing browser: ${error.message}`, 'error');
+//     }
+//   }
   
-  process.exit(0);
-}
+//   process.exit(0);
+// }
 
 /**
  * Process command line arguments for configuration
@@ -288,12 +291,12 @@ function parseCommandLineArgs() {
 }
 
 // Register cleanup handlers
-process.on('SIGINT', cleanupOnExit);
-process.on('SIGTERM', cleanupOnExit);
+// process.on('SIGINT', cleanupOnExit);
+// process.on('SIGTERM', cleanupOnExit);
 process.on('uncaughtException', (error) => {
   logStatus(`Uncaught exception: ${error.message}`, 'error');
   console.error(error);
-  cleanupOnExit();
+  // cleanupOnExit();
 });
 
 // Start the automation process with command line options
