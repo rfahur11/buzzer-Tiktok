@@ -22,14 +22,7 @@ async function handleCaptcha(page) {
     console.log('Menangani CAPTCHA...');
     
     // Take screenshots for analysis
-    const screenshotDir = path.join(__dirname, '../data/captcha-screenshots');
-    if (!fs.existsSync(screenshotDir)) {
-      fs.mkdirSync(screenshotDir, { recursive: true });
-    }
-    
-    const screenshotPath = path.join(screenshotDir, `captcha_${Date.now()}.png`);
-    await page.screenshot({ path: screenshotPath });
-    saveScreenshot(screenshotPath);
+    // Screenshot capture disabled
     
     // Check CAPTCHA type using detection module
     const captchaType = await identifyCaptchaType(page);

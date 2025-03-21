@@ -1,21 +1,50 @@
 const { tiktokLogin } = require('./auth');
 const { commentOnVideo } = require('./comment');
 const { likeVideo } = require('./like');
+const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 const { 
   loadComments, 
   loadUserAccounts, 
   selectCommentByGender,
   ensureDirectoryStructure 
 } = require('./data-loader');
-const { 
-  humanDelay, 
-  logStatus, 
-  takeScreenshot,
-  cleanupScreenshots 
-} = require('./utils.js');
+const { humanDelay, logStatus } = require('./utils.js');
 
 // Track active browser instances for proper cleanup
 const activeBrowsers = [];
+
+/**
+ * Helper function to check and solve CAPTCHA if present
+ * @param {Object} page Puppeteer page object
+ * @returns {Promise<boolean>} Whether CAPTCHA was solved or not present
+ */
+async function checkAndSolveCaptcha(page) {
+  try {
+    // Check for CAPTCHA
+    const hasCaptcha = await checkForCaptcha(page);
+    
+    if (hasCaptcha) {
+      logStatus('CAPTCHA detected, attempting to solve...', 'warning');
+      const captchaSolved = await handleCaptcha(page);
+      
+      if (captchaSolved) {
+        logStatus('CAPTCHA solved successfully', 'success');
+        // Wait to ensure page is fully loaded after CAPTCHA
+        await humanDelay(page, 3000, 5000);
+        return true;
+      } else {
+        logStatus('Failed to solve CAPTCHA', 'error');
+        return false;
+      }
+    }
+    
+    // No CAPTCHA found
+    return true;
+  } catch (error) {
+    logStatus(`Error during CAPTCHA check/solve: ${error.message}`, 'error');
+    return false;
+  }
+}
 
 /**
  * Main function to manage automation of multiple TikTok accounts
@@ -64,8 +93,9 @@ async function manageMultipleAccounts(options = {}) {
       let page = null;
       
       try {
-        // Login with current account
-        const loginResult = await tiktokLogin(account.email, account.password);
+        // Login dengan current account dan langsung ke video target pertama
+        const firstVideoUrl = targetVideos[0]; // Ambil URL video pertama
+        const loginResult = await tiktokLogin(account.email, account.password, firstVideoUrl);
         
         if (loginResult.success) {
           browser = loginResult.browser;
@@ -74,93 +104,127 @@ async function manageMultipleAccounts(options = {}) {
           
           logStatus(`Successfully logged in as ${account.email}`, 'success');
           
-          // Take screenshot of successful login (optional)
-          if (options.takeScreenshots) {
-            await takeScreenshot(page, `login_success_${account.email.replace('@', '_')}`, 'login');
-          }
+          // Proses video pertama yang sudah terbuka
+          logStatus(`Processing first video: ${firstVideoUrl}`, 'info');
           
-          // Process each target video
-          for (const videoUrl of targetVideos) {
-            logStatus(`Processing video: ${videoUrl}`, 'info');
+          // Tambahkan delay untuk pastikan halaman interaktif
+          await humanDelay(page, 2000, 3000);
+          
+          // Cek CAPTCHA pada halaman video
+          const initialCaptchaSolved = await checkAndSolveCaptcha(page);
+          if (!initialCaptchaSolved) {
+            logStatus('Could not solve initial CAPTCHA, skipping this video', 'error');
+          } else {
+            // Proses like video pertama
+            logStatus('Attempting to like the video...', 'info');
+            const likeSuccess = await likeVideo(page);
             
-            // Comment on video if comment datasets exist
+            if (likeSuccess) {
+              logStatus('Successfully liked the video', 'success');
+            } else {
+              logStatus('Failed to like the video', 'warning');
+            }
+            
+            // Tambahkan delay kecil antara like dan komentar
+            await humanDelay(page, 2000, 3000);
+            
+            // Proses komentar jika dataset komentar tersedia
             if (commentDatasets.length > 0) {
-              // Select random dataset and generate gender-appropriate comment
+              // Pilih dataset komentar secara acak
               const randomDataset = commentDatasets[Math.floor(Math.random() * commentDatasets.length)];
-              const selectedComment = selectCommentByGender(randomDataset, account.gender);
               
-              // Attempt to comment on the video
-              const commentSuccess = await commentOnVideo(page, videoUrl, selectedComment);
+              // Pilih komentar berdasarkan gender akun
+              const selectedComment = selectCommentByGender(randomDataset, account.gender || 'neutral');
+              
+              logStatus(`Attempting to comment: "${selectedComment}"`, 'info');
+              const commentSuccess = await commentOnVideo(page, selectedComment);
               
               if (commentSuccess) {
                 logStatus(`Comment posted successfully: "${selectedComment}"`, 'success');
               } else {
-                logStatus(`Failed to comment on video`, 'error');
+                logStatus('Failed to post comment', 'warning');
               }
-              
-              // Add small delay between comment and like
-              await humanDelay(page, 3000, 5000);
             }
-            
-            // Attempt to like the video
-            const likeSuccess = await likeVideo(page);
-            
-            if (likeSuccess) {
-              logStatus('Like added successfully', 'success');
-            } else {
-              logStatus('Failed to like video', 'error');
-            }
-            
-            // Random delay between videos
-            const waitTime = await humanDelay(page, 15000, 30000);
-            logStatus(`Waiting ${Math.round(waitTime/1000)} seconds before next video`, 'info');
           }
           
-          // // Navigate to home before logout
-          // await page.goto('https://www.tiktok.com/', { waitUntil: 'networkidle2' });
-          
-        //   // Remove from active browsers list after closing
-        //   activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
-        //   await browser.close();
-        //   logStatus(`Completed account: ${account.email}`, 'success');
-        // } else {
-        //   logStatus(`Login failed for account: ${account.email}`, 'error');
-        //   if (browser) {
-        //     activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
-        //     await browser.close();
-        //   }
+          // Proses video-video selanjutnya mulai dari indeks 1
+          for (let j = 1; j < targetVideos.length; j++) {  // Gunakan 'j' bukan 'i' karena 'i' sudah digunakan
+            const videoUrl = targetVideos[j];
+            logStatus(`Processing video ${j+1}/${targetVideos.length}: ${videoUrl}`, 'info');
+            
+            try {
+              // Navigate to the next video
+              await page.goto(videoUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+              logStatus('Video page loaded successfully', 'info');
+              
+              // Delay untuk pastikan halaman interaktif
+              await humanDelay(page, 2000, 3000);
+              
+              // Cek CAPTCHA pada halaman video
+              const captchaSolved = await checkAndSolveCaptcha(page);
+              if (!captchaSolved) {
+                logStatus('Could not solve CAPTCHA, skipping this video', 'error');
+                continue; // Skip to next video
+              }
+              
+              // Proses like video
+              logStatus('Attempting to like the video...', 'info');
+              const likeSuccess = await likeVideo(page);
+              
+              if (likeSuccess) {
+                logStatus('Successfully liked the video', 'success');
+              } else {
+                logStatus('Failed to like the video', 'warning');
+              }
+              
+              // Tambahkan delay kecil antara like dan komentar
+              await humanDelay(page, 2000, 3000);
+              
+              // Proses komentar jika dataset komentar tersedia
+              if (commentDatasets.length > 0) {
+                // Pilih dataset komentar secara acak
+                const randomDataset = commentDatasets[Math.floor(Math.random() * commentDatasets.length)];
+                
+                // Pilih komentar berdasarkan gender akun
+                const selectedComment = selectCommentByGender(randomDataset, account.gender || 'neutral');
+                
+                logStatus(`Attempting to comment: "${selectedComment}"`, 'info');
+                const commentSuccess = await commentOnVideo(page, selectedComment);
+                
+                if (commentSuccess) {
+                  logStatus(`Comment posted successfully: "${selectedComment}"`, 'success');
+                } else {
+                  logStatus('Failed to post comment', 'warning');
+                }
+              }
+              
+              // Delay sebelum lanjut ke video berikutnya
+              await humanDelay(page, 3000, 5000);
+              
+            } catch (videoError) {
+              logStatus(`Error processing video ${videoUrl}: ${videoError.message}`, 'error');
+              
+              // Cek apakah ada CAPTCHA setelah error (mungkin muncul karena aktivitas mencurigakan)
+              await checkAndSolveCaptcha(page);
+            }
+          }
         }
-        
-        // Wait random interval before next account
-        // const waitTime = Math.floor(3000 + Math.random() * 6000);
-        // logStatus(`Waiting ${Math.round(waitTime/1000)} seconds before next account`, 'info');
-        // await new Promise(resolve => setTimeout(resolve, waitTime));
-        
-      } catch (error) {
+      }
+       catch (error) {
         logStatus(`Error with account ${account.email}: ${error.message}`, 'error');
         console.error(error);
         
-        // Take error screenshot
-        if (page) {
-          await takeScreenshot(page, `error_${account.email.replace('@', '_')}`, 'errors');
-        }
-        
         // Close browser on error
-        // if (browser) {
-        //   activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
-        //   await browser.close();
-        // }
+        if (browser) {
+          activeBrowsers.splice(activeBrowsers.indexOf(browser), 1);
+          await browser.close();
+        }
       }
     }
     
     // Process completion
     const totalTime = (Date.now() - startTime) / 1000;
     logStatus(`All accounts processed. Total time: ${totalTime.toFixed(2)} seconds`, 'success');
-    
-    // Clean up screenshots if configured
-    if (options.cleanScreenshots) {
-      await cleanupScreenshots();
-    }
     
   } catch (error) {
     logStatus(`Fatal error in automation process: ${error.message}`, 'error');
@@ -194,21 +258,13 @@ async function cleanupOnExit() {
 function parseCommandLineArgs() {
   const args = process.argv.slice(2);
   const options = {
-    takeScreenshots: false,
-    cleanScreenshots: true,
     targetVideos: null
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     
-    if (arg === '--screenshots' || arg === '-s') {
-      options.takeScreenshots = true;
-    }
-    else if (arg === '--keep-screenshots' || arg === '-k') {
-      options.cleanScreenshots = false;
-    }
-    else if (arg === '--videos' || arg === '-v') {
+    if (arg === '--videos' || arg === '-v') {
       if (i + 1 < args.length) {
         try {
           options.targetVideos = args[++i].split(',');
@@ -219,14 +275,11 @@ function parseCommandLineArgs() {
     }
     else if (arg === '--help' || arg === '-h') {
       console.log(`
-TikTok Automation Tool
+            TikTok Automation Tool
 
-Options:
-  --screenshots, -s       Take screenshots during automation
-  --keep-screenshots, -k  Don't delete screenshots after completion
-  --videos, -v <urls>     Comma-separated list of TikTok video URLs to target
-  --help, -h              Show this help message
-      `);
+            Options:
+              --videos, -v <urls>     Comma-separated list of TikTok video URLs to target
+              --help, -h              Show this help message`);
       process.exit(0);
     }
   }

@@ -6,9 +6,10 @@ const path = require('path');
  * Handles TikTok login process with cookie management and captcha handling
  * @param {string} email User's email address
  * @param {string} password User's password
+ * @param {string} targetVideoUrl Optional target video URL to navigate to after successful login
  * @returns {Promise<{success: boolean, page: Page, browser: Browser}>} Login result with browser objects
  */
-async function tiktokLogin(email, password) {
+async function tiktokLogin(email, password, targetVideoUrl = null) {
   console.log('Memulai proses login TikTok...');
   
   const browser = await puppeteer.launch({
@@ -63,16 +64,19 @@ async function tiktokLogin(email, password) {
     
     // Cookie-based login check
     if (hasCookies) {
-      await page.goto('https://www.tiktok.com/', { 
+      // Langsung navigasi ke URL target jika tersedia, jika tidak ke homepage
+      const initialUrl = targetVideoUrl || 'https://www.tiktok.com/';
+      console.log(`Navigasi dengan cookies ke: ${initialUrl}`);
+      
+      await page.goto(initialUrl, { 
         waitUntil: 'networkidle2',
         timeout: 0
       });
-
       
       // Cek apakah ada captcha setelah menavigasi ke halaman
       const hasCaptcha = await checkForCaptcha(page);
       if (hasCaptcha) {
-        console.log('\x1b[33m%s\x1b[0m', '⚠️ CAPTCHA terdeteksi pada halaman utama!');
+        console.log('\x1b[33m%s\x1b[0m', '⚠️ CAPTCHA terdeteksi!');
         // Gunakan API SadCaptcha untuk menyelesaikan captcha
         const captchaSolved = await handleCaptcha(page);
         
@@ -88,15 +92,15 @@ async function tiktokLogin(email, password) {
         return new Promise(resolve => setTimeout(resolve, 5000));
       });
       
-     // Cek apakah sudah login
-     const isLoggedIn = await page.evaluate(() => {
-      const profileLink = document.querySelector('a[data-e2e="nav-profile"]');
-      if (profileLink) {
-        const href = profileLink.getAttribute('href');
-        return href !== '/@' && href.includes('/@');
-      }
-      return false;
-    });
+      // Cek apakah sudah login
+      const isLoggedIn = await page.evaluate(() => {
+        const profileLink = document.querySelector('a[data-e2e="nav-profile"]');
+        if (profileLink) {
+          const href = profileLink.getAttribute('href');
+          return href !== '/@' && href.includes('/@');
+        }
+        return false;
+      });
       
       if (isLoggedIn) {
         console.log('Berhasil login menggunakan cookies tersimpan!');
@@ -222,6 +226,24 @@ async function tiktokLogin(email, password) {
         console.log('Cookies berhasil disimpan untuk penggunaan selanjutnya');
       } catch (error) {
         console.error('Error saat menyimpan cookies:', error);
+      }
+      
+      // Navigasi ke URL video target jika ada setelah berhasil login manual
+      if (targetVideoUrl) {
+        console.log(`Login berhasil, navigasi ke video target: ${targetVideoUrl}`);
+        await page.goto(targetVideoUrl, { 
+          waitUntil: 'networkidle2', 
+          timeout: 60000 
+        }).catch(e => {
+          console.log(`Navigasi ke video target timeout: ${e.message}`);
+        });
+        
+        // Cek captcha setelah navigasi ke video target
+        const hasCaptchaOnTarget = await checkForCaptcha(page);
+        if (hasCaptchaOnTarget) {
+          console.log('\x1b[33m%s\x1b[0m', '⚠️ CAPTCHA terdeteksi pada halaman video target!');
+          await handleCaptcha(page);
+        }
       }
     } else {
       console.log('Login tidak berhasil');

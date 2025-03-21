@@ -33,22 +33,9 @@ function saveScreenshot(screenshotPath) {
  * @returns {Promise<string>} Path to the saved screenshot
  */
 async function takeCaptchaScreenshot(page, prefix = 'captcha') {
-  // Create screenshots directory if it doesn't exist
-  const screenshotDir = path.join(__dirname, '../../data/captcha-screenshots');
-  if (!fs.existsSync(screenshotDir)) {
-    fs.mkdirSync(screenshotDir, { recursive: true });
-  }
-  
-  // Generate filename with timestamp
-  const screenshotPath = path.join(screenshotDir, `${prefix}_${Date.now()}.png`);
-  
-  // Take and save the screenshot
-  await page.screenshot({ path: screenshotPath });
-  
-  // Save reference to the screenshot
-  saveScreenshot(screenshotPath);
-  
-  return screenshotPath;
+  // Return dummy path without taking screenshot
+  console.log('Screenshot capture disabled');
+  return 'screenshot-disabled';
 }
 
 /**

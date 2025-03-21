@@ -1,6 +1,15 @@
 const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 
 /**
+ * Helper function to wait for a specific amount of time
+ * @param {number} timeout Time to wait in milliseconds
+ * @returns {Promise<void>}
+ */
+async function waitFor(timeout) {
+  return new Promise(resolve => setTimeout(resolve, timeout));
+}
+
+/**
  * Gets the current like count from a TikTok video
  * @param {Object} page Puppeteer page object
  * @returns {Promise<number>} Current like count or -1 if not found
@@ -8,54 +17,22 @@ const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 async function getLikeCount(page) {
   try {
     const likeCount = await page.evaluate(() => {
-      // Try various possible selectors for like count element
-      const selectors = [
-        '[data-e2e="like-count"]',
-        'span[data-e2e="like-count"]',
-        'strong[data-e2e="like-count"]',
-        'span[data-e2e="browse-like-count"]',
-        // Additional selectors for newer TikTok UI versions
-        '.tiktok-1kw3fsb-StrongText',
-        '.tiktok-1e4uhe3-StrongText'
-      ];
+      // Try to find the like count element
+      const element = document.querySelector('[data-e2e="like-count"]');
       
-      for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        if (element) {
-          // Get text and convert "K" or "M" if present
-          let text = element.innerText.trim();
-          
-          if (text.endsWith('K')) {
-            return parseFloat(text.replace('K', '')) * 1000;
-          } else if (text.endsWith('M')) {
-            return parseFloat(text.replace('M', '')) * 1000000;
-          } else if (text.endsWith('B')) {
-            return parseFloat(text.replace('B', '')) * 1000000000;
-          } else {
-            // Remove non-digit characters and parse
-            return parseInt(text.replace(/[^\d]/g, '')) || 0;
-          }
-        }
-      }
-      
-      // Alternative approach: try to find any element containing the like count
-      const possibleLikeElements = document.querySelectorAll('strong, span');
-      for (const element of possibleLikeElements) {
-        // Check if element is near like button
-        const likeButton = document.querySelector('[data-e2e="like-icon"]');
-        if (likeButton && element.getBoundingClientRect().left < likeButton.getBoundingClientRect().left + 100) {
-          const text = element.innerText.trim();
-          if (/^\d+(\.\d+)?[KMB]?$/.test(text)) {
-            if (text.endsWith('K')) {
-              return parseFloat(text.replace('K', '')) * 1000;
-            } else if (text.endsWith('M')) {
-              return parseFloat(text.replace('M', '')) * 1000000;
-            } else if (text.endsWith('B')) {
-              return parseFloat(text.replace('B', '')) * 1000000000;
-            } else {
-              return parseInt(text) || 0;
-            }
-          }
+      if (element) {
+        // Get text and convert "K" or "M" if present
+        let text = element.innerText.trim();
+        
+        if (text.endsWith('K')) {
+          return parseFloat(text.replace('K', '')) * 1000;
+        } else if (text.endsWith('M')) {
+          return parseFloat(text.replace('M', '')) * 1000000;
+        } else if (text.endsWith('B')) {
+          return parseFloat(text.replace('B', '')) * 1000000000;
+        } else {
+          // Remove non-digit characters and parse
+          return parseInt(text.replace(/[^\d]/g, '')) || 0;
         }
       }
       
@@ -70,357 +47,211 @@ async function getLikeCount(page) {
 }
 
 /**
- * Checks if a video is already liked
+ * Attempts to find and click the like button using a direct Puppeteer approach
  * @param {Object} page Puppeteer page object
- * @returns {Promise<boolean>} Whether the video is liked
+ * @returns {Promise<boolean>} Whether the like button was found and clicked
  */
-async function checkLikeStatus(page) {
+async function findAndClickLikeButton(page) {
+  console.log('Attempting to find and click like button...');
+  
+  // List of possible selectors for like button
+  const likeButtonSelectors = [
+    'button:has([data-e2e="like-icon"])',
+    '[data-e2e="like-icon"]'
+  ];
+  
   try {
-    return await page.evaluate(() => {
-      // Check various selectors for active like button
-      const selectors = [
-        '[data-e2e="like-icon"].active',
-        '[data-e2e="like-icon"][class*="active"]',
-        '[data-e2e="like-icon"] svg[fill="#FE2C55"]',
-        '.like-button-active',
-        'button[aria-label="Liked"]',
-        'button[aria-label="Dislike"]', // English version
-        'button[aria-label="Batal Suka"]', // Indonesian version
-        // Additional selectors for newer UI
-        'svg[fill="rgb(254, 44, 85)"]',
-        'button[data-e2e="like-icon"][aria-pressed="true"]'
-      ];
-      
-      for (const selector of selectors) {
-        if (document.querySelector(selector)) {
+    // Try each selector
+    for (const selector of likeButtonSelectors) {
+      try {
+        // Wait briefly for the button to be available
+        await page.waitForSelector(selector, { timeout: 3000 });
+        
+        // Get the button and click it
+        const likeButton = await page.$(selector);
+        if (likeButton) {
+          // Scroll to make sure button is visible
+          await page.evaluate(el => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, likeButton);
+          
+          // Wait a moment for any animations to finish
+          await waitFor(1000);
+          
+          // Click the button
+          await likeButton.click();
+          console.log(`Like button found and clicked (selector: ${selector})`);
+          
+          // Wait for UI to update
+          await waitFor(2000);
           return true;
         }
+      } catch (selectorError) {
+        // Try next selector
+        continue;
       }
+    }
+    
+    // If all selectors fail, try a more robust method using page.evaluate
+    console.log('Trying fallback method for finding like button...');
+    
+    const clicked = await page.evaluate(() => {
+      // Find like buttons based on visual position and properties
+      const allButtons = Array.from(document.querySelectorAll('button'));
       
-      // Alternative: Check SVG fill color if present
-      const likeIcon = document.querySelector('[data-e2e="like-icon"] svg') || 
-                       document.querySelector('button[aria-label="Like"] svg') ||
-                       document.querySelector('button[aria-label="Suka"] svg');
+      // Filter buttons that look like like buttons
+      const possibleLikeButtons = allButtons.filter(btn => {
+        // Check if it has an SVG child
+        const hasSvg = btn.querySelector('svg');
+        if (!hasSvg) return false;
+        
+        // Check position (usually at bottom or side of video)
+        const rect = btn.getBoundingClientRect();
+        const isInLikePosition = rect.bottom > window.innerHeight * 0.5;
+        
+        // Check if it has heart or like related attributes
+        const hasLikeAttr = 
+          btn.getAttribute('aria-label')?.toLowerCase().includes('like') ||
+          btn.innerHTML.toLowerCase().includes('like') ||
+          btn.getAttribute('data-e2e')?.includes('like');
+        
+        return (isInLikePosition && hasSvg) || hasLikeAttr;
+      });
       
-      if (likeIcon) {
-        // Check if fill attribute is TikTok red color
-        const fill = likeIcon.getAttribute('fill');
-        if (fill && (fill === '#FE2C55' || fill === 'rgb(254, 44, 85)')) {
-          return true;
-        }
+      // If we found possible like buttons, click the first one
+      if (possibleLikeButtons.length > 0) {
+        const likeButton = possibleLikeButtons[0];
         
-        // Check styles if attribute is not set
-        const computedStyle = window.getComputedStyle(likeIcon);
-        const fillColor = computedStyle.fill || computedStyle.color;
+        // Ensure the button is in view
+        likeButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
-        if (fillColor && (fillColor === '#FE2C55' || fillColor === 'rgb(254, 44, 85)')) {
-          return true;
-        }
+        // Small delay for scroll
+        return new Promise(resolve => {
+          setTimeout(() => {
+            likeButton.click();
+            console.log('Clicked like button using fallback method');
+            resolve(true);
+          }, 500);
+        });
       }
       
       return false;
     });
+    
+    if (clicked) {
+      return true;
+    }
+    
+    console.log('Could not find like button after trying all methods');
+    return false;
+    
   } catch (error) {
-    console.error('Error when checking like status:', error);
+    console.error('Error finding/clicking like button:', error);
     return false;
   }
 }
 
 /**
- * Attempts to find and click the like button using multiple strategies
+ * Main function to like a video on TikTok based on like count change
  * @param {Object} page Puppeteer page object
- * @returns {Promise<boolean>} Whether the like button was found and clicked
- */
-async function findAndClickLikeButton(page) {
-  // Strategy 1: Using direct selectors
-  const likeButtonSelectors = [
-    '[data-e2e="like-icon"]',
-    'button[aria-label="Like"]',
-    'button[aria-label="Suka"]',
-    '.like-button',
-    // Try more general selectors with SVG search
-    'button:has(svg[fill="currentColor"])'
-  ];
-  
-  let likeButton = null;
-  
-  // Try all possible selectors for like button
-  for (const selector of likeButtonSelectors) {
-    try {
-      likeButton = await page.$(selector);
-      if (likeButton) {
-        console.log(`Found like button with selector: ${selector}`);
-        
-        // Ensure button is in view and wait a moment
-        await page.evaluate(el => {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          return new Promise(resolve => setTimeout(resolve, 1000));
-        }, likeButton);
-        
-        // Click the button
-        await likeButton.click();
-        console.log('Clicked like button');
-        return true;
-      }
-    } catch (error) {
-      // Continue to next selector
-    }
-  }
-  
-  // Strategy 2: Using page.evaluate for better detection
-  if (!likeButton) {
-    console.log('Trying alternative method to find like button...');
-    
-    try {
-      const clicked = await page.evaluate(() => {
-        // Find all buttons and check various attributes
-        const buttons = Array.from(document.querySelectorAll('button'));
-        
-        // Function to find like button with various criteria
-        const findLikeButton = () => {
-          for (const button of buttons) {
-            // Check for like text
-            const hasLikeText = (button.innerText || '').toLowerCase().includes('like');
-            
-            // Check for heart icon
-            const hasHeartIcon = button.innerHTML.includes('svg') && 
-                              (button.innerHTML.includes('heart') || 
-                               button.innerHTML.includes('like'));
-            
-            // Check aria-label
-            const ariaLabel = button.getAttribute('aria-label') || '';
-            const hasLikeLabel = ariaLabel.toLowerCase().includes('like') || 
-                               ariaLabel.toLowerCase().includes('suka');
-            
-            // Check position (usually at bottom or side of video)
-            const rect = button.getBoundingClientRect();
-            const isInLikePosition = rect.bottom > window.innerHeight * 0.6;
-            
-            // Check for data-e2e attribute
-            const hasDataE2E = button.getAttribute('data-e2e') === 'like-icon';
-            
-            if (hasLikeText || hasHeartIcon || hasLikeLabel || 
-                (isInLikePosition && button.querySelector('svg')) || hasDataE2E) {
-              return button;
-            }
-          }
-          
-          return null;
-        };
-        
-        const likeBtn = findLikeButton();
-        if (!likeBtn) return false;
-        
-        // Ensure button is visible
-        likeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Wait a moment and click
-        return new Promise(resolve => {
-          setTimeout(() => {
-            likeBtn.click();
-            resolve(true);
-          }, 1000);
-        });
-      });
-      
-      if (clicked) {
-        console.log('Successfully clicked like button using alternative method');
-        return true;
-      }
-    } catch (error) {
-      console.error('Error with alternative like button method:', error);
-    }
-  }
-  
-  // Strategy 3: Using JavaScript events for more reliable clicking
-  console.log('Trying event-based method to trigger like...');
-  
-  try {
-    const eventSuccess = await page.evaluate(() => {
-      const findLikeButton = () => {
-        const selectors = [
-          '[data-e2e="like-icon"]',
-          'button[aria-label="Like"]',
-          'button[aria-label="Suka"]'
-        ];
-        
-        for (const selector of selectors) {
-          const element = document.querySelector(selector);
-          if (element) return element;
-        }
-        
-        return null;
-      };
-      
-      const likeButton = findLikeButton();
-      if (!likeButton) return false;
-      
-      // First focus the element
-      likeButton.focus();
-      
-      // Then dispatch a sequence of events for more robust clicking
-      return new Promise(resolve => {
-        setTimeout(() => {
-          // Mouse down event
-          likeButton.dispatchEvent(new MouseEvent('mousedown', {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0
-          }));
-          
-          setTimeout(() => {
-            // Mouse up event
-            likeButton.dispatchEvent(new MouseEvent('mouseup', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              button: 0
-            }));
-            
-            // Click event
-            likeButton.dispatchEvent(new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              button: 0
-            }));
-            
-            resolve(true);
-          }, 100);
-        }, 100);
-      });
-    });
-    
-    if (eventSuccess) {
-      console.log('Successfully liked using event-based method');
-      return true;
-    }
-  } catch (error) {
-    console.error('Error with event-based like method:', error);
-  }
-  
-  console.log('Failed to find like button after trying all methods');
-  return false;
-}
-
-/**
- * Main function to like a TikTok video
- * @param {Object} page Puppeteer page object
- * @returns {Promise<boolean>} Whether the like was successfully applied
+ * @returns {Promise<boolean>} Whether the video was successfully liked
  */
 async function likeVideo(page) {
-  console.log('Attempting to like video...');
+  console.log('Starting process to like video...');
   
   try {
-    // Wait for loading to complete
-    await page.evaluate(() => {
-      return new Promise(resolve => setTimeout(resolve, 3000));
-    });
-    
-    // Check for CAPTCHA before liking
+    // Check for CAPTCHA before attempting to like
     const hasCaptchaBeforeLike = await checkForCaptcha(page);
     if (hasCaptchaBeforeLike) {
-      console.log('\x1b[33m%s\x1b[0m', '⚠️ CAPTCHA detected before liking!');
+      console.log('CAPTCHA detected before liking');
       const captchaSolved = await handleCaptcha(page);
-      
-      if (captchaSolved) {
-        console.log('\x1b[32m%s\x1b[0m', '✅ CAPTCHA successfully solved.');
-      } else {
-        console.log('\x1b[31m%s\x1b[0m', '❌ Failed to solve CAPTCHA. Skipping like.');
+      if (!captchaSolved) {
+        console.error('Failed to solve CAPTCHA');
         return false;
       }
     }
     
-    // Get initial like count
+    // Get initial like count 
     const initialLikeCount = await getLikeCount(page);
     console.log(`Initial like count: ${initialLikeCount}`);
     
-    // Check if already liked
-    const initialLikeStatus = await checkLikeStatus(page);
-    
-    if (initialLikeStatus) {
-      console.log('Video already liked previously');
-      return true;
-    }
-    
-    // Find and click like button
+    // Find and click the like button
     const likeClicked = await findAndClickLikeButton(page);
-    
     if (!likeClicked) {
-      console.log('Could not find or click like button');
+      console.log('Could not click like button');
       return false;
     }
     
-    // Wait for like action to register
-    await page.evaluate(() => {
-      return new Promise(resolve => setTimeout(resolve, 2000));
-    });
+    // Wait for like count to update
+    await waitFor(3000);
     
-    // Check for CAPTCHA after attempting like
-    const hasCaptchaAfterLike = await checkForCaptcha(page);
-    if (hasCaptchaAfterLike) {
-      console.log('\x1b[33m%s\x1b[0m', '⚠️ CAPTCHA detected after like attempt!');
-      const captchaSolved = await handleCaptcha(page);
+    // Get new like count
+    const newLikeCount = await getLikeCount(page);
+    console.log(`New like count: ${newLikeCount}`);
+    
+    // If like count increased, like was successful
+    if (initialLikeCount >= 0 && newLikeCount > initialLikeCount) {
+      console.log('Like count increased, video successfully liked!');
+      return true;
+    }
+    
+    // If like count decreased, we might have clicked an already liked video
+    if (initialLikeCount >= 0 && newLikeCount < initialLikeCount) {
+      console.log('Like count decreased - video was already liked and we unliked it. Clicking again to revert...');
       
-      if (captchaSolved) {
-        console.log('\x1b[32m%s\x1b[0m', '✅ CAPTCHA successfully solved.');
-        
-        // Try liking again after solving CAPTCHA
-        await findAndClickLikeButton(page);
-        
-        await page.evaluate(() => {
-          return new Promise(resolve => setTimeout(resolve, 2000));
-        });
-      } else {
-        console.log('\x1b[31m%s\x1b[0m', '❌ Failed to solve CAPTCHA.');
+      // Wait a moment before clicking again
+      await waitFor(1000);
+      
+      // Try clicking again to revert the unlike action
+      const retryClicked = await findAndClickLikeButton(page);
+      if (!retryClicked) {
+        console.log('Could not click like button on retry');
         return false;
+      }
+      
+      // Wait for UI to update
+      await waitFor(3000);
+      
+      // Check final like count
+      const finalLikeCount = await getLikeCount(page);
+      console.log(`Final like count after retry: ${finalLikeCount}`);
+      
+      // Success if like count increased from the "unliked" state
+      if (finalLikeCount > newLikeCount) {
+        console.log('Successfully reverted to liked state');
+        return true;
       }
     }
     
-    // Verify like was successful
-    const newLikeStatus = await checkLikeStatus(page);
-    
-    // Wait a moment for like count to update
-    await page.evaluate(() => {
-      return new Promise(resolve => setTimeout(resolve, 3000));
-    });
-    
-    // Check new like count (may not always change in UI)
-    const newLikeCount = await getLikeCount(page);
-    
-    console.log(`Like status after clicking: ${newLikeStatus ? 'Liked' : 'Not liked'}`);
-    console.log(`New like count: ${newLikeCount}`);
-    
-    // Success if like status changed or count increased
-    const success = newLikeStatus || (newLikeCount > initialLikeCount && initialLikeCount >= 0);
-    
-    if (success) {
-      console.log('Video successfully liked!');
-    } else {
-      console.log('Seems like the like action failed');
+    // If like count didn't change significantly, try one more time
+    if (Math.abs(newLikeCount - initialLikeCount) <= 1) {
+      console.log('Like count relatively unchanged, trying one more time...');
+      
+      // Try clicking once more
+      await findAndClickLikeButton(page);
+      await waitFor(3000);
+      
+      // Check final count
+      const finalRetryCount = await getLikeCount(page);
+      console.log(`Final like count after retry: ${finalRetryCount}`);
+      
+      if (finalRetryCount > initialLikeCount) {
+        console.log('Successfully liked the video on retry!');
+        return true;
+      }
     }
     
-    return success;
+    console.log('Failed to like the video after attempts');
+    return false;
+    
   } catch (error) {
-    console.error('Error when liking video:', error);
-    
-    // Take screenshot for debugging
-    try {
-      const screenshotPath = `./data/debug-screenshots/like_error_${Date.now()}.png`;
-      await page.screenshot({ path: screenshotPath });
-      console.log(`Error screenshot saved to ${screenshotPath}`);
-    } catch (screenshotError) {
-      console.error('Could not save error screenshot:', screenshotError);
-    }
-    
+    console.error('Error in likeVideo function:', error);
     return false;
   }
 }
 
 module.exports = {
-  likeVideo,
   getLikeCount,
-  checkLikeStatus,
-  findAndClickLikeButton
+  findAndClickLikeButton,
+  likeVideo
 };

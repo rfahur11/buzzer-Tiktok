@@ -74,57 +74,6 @@ async function getLikeCount(page) {
  * @param {Object} page Puppeteer page object
  * @returns {Promise<boolean>} Whether the video is liked
  */
-async function checkLikeStatus(page) {
-  try {
-    return await page.evaluate(() => {
-      // Check various selectors for active like button
-      const selectors = [
-        '[data-e2e="like-icon"].active',
-        '[data-e2e="like-icon"][class*="active"]',
-        '[data-e2e="like-icon"] svg[fill="#FE2C55"]',
-        '.like-button-active',
-        'button[aria-label="Liked"]',
-        'button[aria-label="Dislike"]', // English version
-        'button[aria-label="Batal Suka"]', // Indonesian version
-        // Additional selectors for newer UI
-        'svg[fill="rgb(254, 44, 85)"]',
-        'button[data-e2e="like-icon"][aria-pressed="true"]'
-      ];
-      
-      for (const selector of selectors) {
-        if (document.querySelector(selector)) {
-          return true;
-        }
-      }
-      
-      // Alternative: Check SVG fill color if present
-      const likeIcon = document.querySelector('[data-e2e="like-icon"] svg') || 
-                       document.querySelector('button[aria-label="Like"] svg') ||
-                       document.querySelector('button[aria-label="Suka"] svg');
-      
-      if (likeIcon) {
-        // Check if fill attribute is TikTok red color
-        const fill = likeIcon.getAttribute('fill');
-        if (fill && (fill === '#FE2C55' || fill === 'rgb(254, 44, 85)')) {
-          return true;
-        }
-        
-        // Check styles if attribute is not set
-        const computedStyle = window.getComputedStyle(likeIcon);
-        const fillColor = computedStyle.fill || computedStyle.color;
-        
-        if (fillColor && (fillColor === '#FE2C55' || fillColor === 'rgb(254, 44, 85)')) {
-          return true;
-        }
-      }
-      
-      return false;
-    });
-  } catch (error) {
-    console.error('Error when checking like status:', error);
-    return false;
-  }
-}
 
 /**
  * Attempts to find and click the like button using multiple strategies
@@ -336,8 +285,6 @@ async function likeVideo(page) {
     const initialLikeCount = await getLikeCount(page);
     console.log(`Initial like count: ${initialLikeCount}`);
     
-    // Check if already liked
-    const initialLikeStatus = await checkLikeStatus(page);
     
     if (initialLikeStatus) {
       console.log('Video already liked previously');
@@ -378,8 +325,6 @@ async function likeVideo(page) {
       }
     }
     
-    // Verify like was successful
-    const newLikeStatus = await checkLikeStatus(page);
     
     // Wait a moment for like count to update
     await page.evaluate(() => {
@@ -421,6 +366,5 @@ async function likeVideo(page) {
 module.exports = {
   likeVideo,
   getLikeCount,
-  checkLikeStatus,
   findAndClickLikeButton
 };
