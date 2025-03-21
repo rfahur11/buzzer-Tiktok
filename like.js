@@ -19,7 +19,6 @@ async function waitFor(timeout) {
 async function dismissTikTokPopups(page) {
   console.log('Checking for TikTok floating popups...');
   
-  try {
     // List of selectors for common TikTok popup close buttons
     const closeButtonSelectors = [
       // Selector spesifik yang Anda temukan
@@ -69,94 +68,6 @@ async function dismissTikTokPopups(page) {
         // Continue to next selector
       }
     }
-    
-    // If no popup found with direct selectors, try the general detection approach
-    if (!popupDismissed) {
-      console.log('Trying general popup detection approach...');
-
-      const foundOverlay = await page.evaluate(() => {
-        // Find elements that might be popups/overlays
-        // 1. Look for overlay containers based on position and z-index
-        const overlays = Array.from(document.querySelectorAll('*')).filter(el => {
-          const style = window.getComputedStyle(el);
-          const rect = el.getBoundingClientRect();
-          
-          // Element needs to be visible
-          if (style.display === 'none' || style.visibility === 'hidden' || 
-              style.opacity === '0' || rect.width < 10 || rect.height < 10) {
-            return false;
-          }
-          
-          // Element should have high z-index and be positioned absolutely/fixed
-          const zIndex = parseInt(style.zIndex);
-          const isPositioned = style.position === 'fixed' || style.position === 'absolute';
-          const isProminent = !isNaN(zIndex) && zIndex > 100;
-          
-          // Element should overlap with typical like button locations
-          // (typically bottom of screen or right side)
-          const overlapsLikeArea = 
-              (rect.bottom > window.innerHeight * 0.5 && rect.left < window.innerWidth * 0.3) || 
-              (rect.right > window.innerWidth * 0.7);
-          
-          return isPositioned && (isProminent || overlapsLikeArea);
-        });
-        
-        // Check if we found any potential overlays
-        if (overlays.length === 0) return false;
-        
-        // Try to find close buttons in the overlays
-        for (const overlay of overlays) {
-          // Look for close buttons or icons
-          const closeElements = [
-            // Direct children that might be close buttons
-            ...overlay.querySelectorAll('[class*="close"]'),
-            ...overlay.querySelectorAll('svg'),
-            ...overlay.querySelectorAll('button'),
-            // Elements with X or close icon
-            ...overlay.querySelectorAll('[aria-label="Close"]'),
-            ...overlay.querySelectorAll('[aria-label="Tutup"]')
-          ];
-          
-          // Filter to likely close buttons
-          const closeButtons = closeElements.filter(el => {
-            const rect = el.getBoundingClientRect();
-            // Close buttons are typically small
-            return rect.width > 0 && rect.width < 50 && rect.height > 0 && rect.height < 50;
-          });
-          
-          if (closeButtons.length > 0) {
-            // Sort by position (prefer top-right positioned elements as they're typically close buttons)
-            closeButtons.sort((a, b) => {
-              const aRect = a.getBoundingClientRect();
-              const bRect = b.getBoundingClientRect();
-              // Score based on proximity to top-right corner
-              const aScore = aRect.top + (window.innerWidth - aRect.right);
-              const bScore = bRect.top + (window.innerWidth - bRect.right);
-              return aScore - bScore;
-            });
-            
-            // Click the best candidate
-            closeButtons[0].click();
-            console.log("Clicked a likely close button");
-            return true;
-          }
-        }
-        
-        return false;
-      });
-      
-      if (foundOverlay) {
-        console.log('Found and dismissed overlay using general detection');
-        popupDismissed = true;
-        
-      }
-    }
-    
-    return popupDismissed;
-  } catch (error) {
-    console.error('Error dismissing TikTok popups:', error);
-    return false;
-  }
 }
 
 /**
