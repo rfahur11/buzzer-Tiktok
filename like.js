@@ -2,12 +2,6 @@ const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 const fs = require('fs');
 const path = require('path');
 
-// Pastikan direktori debug-screenshots ada
-const debugDir = path.join(__dirname, 'data', 'debug-screenshots');
-if (!fs.existsSync(debugDir)) {
-  fs.mkdirSync(debugDir, { recursive: true });
-}
-
 /**
  * Helper function to wait for a specific amount of time
  * @param {number} timeout Time to wait in milliseconds
@@ -68,14 +62,7 @@ async function dismissTikTokPopups(page) {
           await waitFor(1000);
           
           popupDismissed = true;
-          console.log('Popup successfully dismissed!');
-          
-          // Take a debug screenshot if popup was found and clicked
-          await page.screenshot({
-            path: path.join(debugDir, `popup_dismissed_${Date.now()}.png`),
-            fullPage: false
-          });
-          break;
+          console.log('Popup successfully dismissed!');        
         }
       } catch (error) {
         console.log(`Failed to handle selector ${selector}: ${error.message}`);
@@ -86,13 +73,7 @@ async function dismissTikTokPopups(page) {
     // If no popup found with direct selectors, try the general detection approach
     if (!popupDismissed) {
       console.log('Trying general popup detection approach...');
-      
-      // Take before screenshot for debugging
-      await page.screenshot({
-        path: path.join(debugDir, `before_general_detection_${Date.now()}.png`),
-        fullPage: false
-      });
-      
+
       const foundOverlay = await page.evaluate(() => {
         // Find elements that might be popups/overlays
         // 1. Look for overlay containers based on position and z-index
@@ -168,14 +149,6 @@ async function dismissTikTokPopups(page) {
         console.log('Found and dismissed overlay using general detection');
         popupDismissed = true;
         
-        // Wait for animation to complete
-        await waitFor(1500);
-        
-        // Take after screenshot
-        await page.screenshot({
-          path: path.join(debugDir, `after_general_detection_${Date.now()}.png`),
-          fullPage: false
-        });
       }
     }
     
@@ -417,16 +390,6 @@ async function likeVideo(page) {
           }
           return false;
         });
-        
-        if (!jsClick) {
-          // Take a debug screenshot if we still can't click
-          console.log('\x1b[31m%s\x1b[0m', '❌ Failed to click like button after multiple attempts');
-          await page.screenshot({
-            path: path.join(debugDir, `like_button_not_found_${Date.now()}.png`),
-            fullPage: true
-          });
-          return false;
-        }
       }
     }
     
@@ -504,30 +467,13 @@ async function likeVideo(page) {
     // Tak ada perubahan signifikan setelah semua upaya
     console.log('\x1b[33m%s\x1b[0m', '⚠️ No significant change in like count after attempts');
     
-    // Lakukan screenshot final untuk debugging
-    await page.screenshot({
-      path: path.join(debugDir, `like_final_state_${Date.now()}.png`),
-      fullPage: false
-    });
-    
     // Kita anggap berhasil jika proses berjalan tanpa error, meskipun like count tidak berubah
     // (karena terkadang TikTok tidak memperbarui count dengan segera)
     console.log('Process completed without errors, assuming success');
     return true;
     
   } catch (error) {
-    console.error('\x1b[31m%s\x1b[0m', `❌ Error in likeVideo function: ${error.message}`);
-    
-    // Take a screenshot on error for debugging
-    try {
-      await page.screenshot({
-        path: path.join(debugDir, `like_error_${Date.now()}.png`),
-        fullPage: true
-      });
-    } catch (screenshotError) {
-      console.log('Failed to take error screenshot:', screenshotError.message);
-    }
-    
+    console.error('\x1b[31m%s\x1b[0m', `❌ Error in likeVideo function: ${error.message}`);    
     return false;
   }
 }
