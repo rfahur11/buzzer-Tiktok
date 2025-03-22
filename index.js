@@ -1,6 +1,6 @@
 const { tiktokLogin } = require('./auth');
 const { likeVideo } = require('./like');
-// const { commentOnVideo } = require('./comment');
+const { commentOnVideo } = require('./comment');
 const { checkForCaptcha, handleCaptcha } = require('./captcha/index');
 const { 
   loadComments, 
